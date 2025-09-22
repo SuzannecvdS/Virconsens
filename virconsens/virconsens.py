@@ -59,6 +59,12 @@ parser.add_argument('-af',
                     type=float,
                    required = False)
 
+parser.add_argument('-k', 
+                    '--keepindels',
+                    help='Keep 1 and 2 nt indels',
+                    action='store_true',
+                   required = False)
+
 def process_batch(start, stop, bamfile, reference):
     bamfile = pysam.AlignmentFile(bamfile, "rb")
     ref_name = bamfile.references[0]
@@ -157,7 +163,7 @@ def main():
                 pos += 1
                 continue
             #Ignore indels of 1 or 2 nt
-            elif abs(len(ref_seq)-len(alt_seq)) in [1,2]:
+            elif abs(len(ref_seq)-len(alt_seq)) in [1,2] and not args.keepindels:
                 consensus.append(ref_seq)
             else:
                 consensus.append(alt_seq)
