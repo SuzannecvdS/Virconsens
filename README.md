@@ -13,6 +13,7 @@ Tool to create a consensus sequence from mapped virus Nanopore data
 ```
 usage: virconsens.py [-h] -b BAM -o OUT -n OUTNAME -r REFERENCE
                      [-vf VARIANTFILE] [-c CORES] [-d MINDEPTH] [-af MINAF]
+                     [--maxdepth MAXDEPTH]
 
 Virconsens
 
@@ -33,4 +34,6 @@ optional arguments:
                         alleles
   -af MINAF, --minAF MINAF
                         Minimal allele frequency to output
+  --maxdepth MAXDEPTH
+                        Maximum depth to consider at any position
 ```
