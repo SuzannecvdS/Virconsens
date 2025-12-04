@@ -1,5 +1,4 @@
 from setuptools import setup, find_packages
-from virconsens import __version__
 
 setup(name='virconsens',
     version='1.2',
