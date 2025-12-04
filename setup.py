@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 from virconsens import __version__
 
 setup(name='virconsens',
-    version=__version__,
+    version='1.2',
     packages=find_packages(),
     entry_points={
         'console_scripts': [
