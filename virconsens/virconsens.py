@@ -6,6 +6,7 @@ import re
 import multiprocessing
 import itertools
 
+
 parser = argparse.ArgumentParser(description='Virconsens')
 
 parser.add_argument('-b',
@@ -65,22 +66,30 @@ parser.add_argument('-k',
                     action='store_true',
                    required = False)
 
-def process_batch(start, stop, bamfile, reference):
+parser.add_argument('--maxdepth',
+                    help='Maximum depth to consider at any position',
+                    default=8000,
+                    type=int,
+                    required = False)
+
+
+def process_batch(start, stop, bamfile, maxdepth, reference):
     bamfile = pysam.AlignmentFile(bamfile, "rb")
     ref_name = bamfile.references[0]
     refseq = pysam.Fastafile(reference).fetch(ref_name)
     
-    pileup = bamfile.pileup(contig=ref_name, start=start, stop=stop, ignore_orphans=False, min_mapping_quality=0, min_base_quality=0, truncate=True)
+    pileup = bamfile.pileup(contig=ref_name, start=start, stop=stop, ignore_orphans=False, min_mapping_quality=0, min_base_quality=0, truncate=True, max_depth=maxdepth)
     
     return([parse_column(p.reference_pos, p.get_query_sequences(add_indels=True),p.get_num_aligned(), refseq) for p in pileup])
+
 
 def parse_column(ref_pos, allele_list, num_aln, refseq):
 
     COMB_allele = Counter()
     
-    #Initialize the reference allele to 0 in case it is not present in any of the reads
+    # Initialize the reference allele to 0 in case it is not present in any of the reads
     COMB_allele[(refseq[ref_pos].upper(),refseq[ref_pos].upper())] = 0
-    
+
     def add_allele(ref, alt):
         if (ref.islower() | alt.islower()):
             COMB_allele[(ref.upper(),alt.upper())] += 1
@@ -90,15 +99,15 @@ def parse_column(ref_pos, allele_list, num_aln, refseq):
     insert_finder = re.compile("(.*)\+\d+(.*)")
 
     for var in allele_list:
-        #Ignore positions that represent deletions
+        # Ignore positions that represent deletions
         if '*' in var:
             continue
 
         # - means next nucleotide is a deletion
         if '-' in var:
-            #Determine number of deletions based on the number in the pilup string
+            # Determine number of deletions based on the number in the pilup string
             n_del = int(''.join(filter(str.isdigit, var)))
-            #Get the nucleotides that were deleted (add 1 to select the reference position plus the deleted nucleotidesy)
+            # Get the nucleotides that were deleted (add 1 to select the reference position plus the deleted nucleotidesy)
             if var.islower():
                 var=refseq[ref_pos:(ref_pos+n_del+1)].lower()
             else:
@@ -111,7 +120,7 @@ def parse_column(ref_pos, allele_list, num_aln, refseq):
         else:
             add_allele(refseq[ref_pos], var)
 
-    #Sort alleles by counts, highest count is major alternative allele
+    # Sort alleles by counts, highest count is major alternative allele
     major = sorted(COMB_allele, key=COMB_allele.get, reverse=True)[0]
     ref_seq = major[0]
     alt_seq = major[1]
@@ -119,6 +128,7 @@ def parse_column(ref_pos, allele_list, num_aln, refseq):
     alt_AF = alt_count/num_aln
 
     return([str(num_aln), ref_pos, ref_seq, alt_seq, alt_count, alt_AF])
+
 
 def main():
     args = parser.parse_args()
@@ -130,7 +140,7 @@ def main():
     #Make an array of start-stop intervals to parallelize processing
     genome_length = len(refseq)
     split = int(genome_length/args.cores)
-    batch = [[i*split+1,(i+1)*split+1, args.bam, args.reference] for i in range(args.cores)]
+    batch = [[i*split+1,(i+1)*split+1, args.bam, args.maxdepth, args.reference] for i in range(args.cores)]
 
     #Adjust the last "stop" to be the genome length
     batch[-1][1] = genome_length
@@ -180,6 +190,7 @@ def main():
     with open(args.out, 'w') as out_consensus:
         print(''.join(['>',args.outname]), file=out_consensus)
         print(consensus, file=out_consensus)
+
 
 if __name__ == '__main__':
     main()
