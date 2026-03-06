@@ -46,7 +46,8 @@ parser.add_argument('--freqfile',
                     type=str,
                     required = False)
 
-parser.add_argument('--coverageplot',
+parser.add_argument('-p',
+                    '--coverageplot',
                     help='Output path for coverage plot (html file)',
                     type=str,
                     required = False)
