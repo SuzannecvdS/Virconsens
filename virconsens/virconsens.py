@@ -102,14 +102,19 @@ def process_batch(start, stop, bamfile, maxdepth, reference):
         max_depth=maxdepth
     )
     
+    pileup_dict = {}
+    for p in pileup:
+        pileup_dict[p.reference_pos] = (p.get_query_sequences(add_indels=True), p.get_num_aligned())
+    
     variant_rows = []
     freq_rows = []
-    for p in pileup:
-        allele_list = p.get_query_sequences(add_indels=True)
-        num_aln = p.get_num_aligned()
-
-        variant_rows.append(parse_column(p.reference_pos, allele_list, num_aln, refseq))
-        freq_rows.append(parse_column_freq(p.reference_pos, allele_list, num_aln, refseq))
+    for pos in range(start, stop):
+        if pos in pileup_dict:
+            allele_list, num_aln = pileup_dict[pos]
+        else:
+            allele_list, num_aln = [], 0
+        variant_rows.append(parse_column(pos, allele_list, num_aln, refseq))
+        freq_rows.append(parse_column_freq(pos, allele_list, num_aln, refseq))
 
     return (variant_rows, freq_rows)
 
@@ -156,7 +161,10 @@ def parse_column(ref_pos, allele_list, num_aln, refseq):
     ref_seq = major[0]
     alt_seq = major[1]
     alt_count = COMB_allele[major]
-    alt_AF = alt_count/num_aln
+    if num_aln == 0:
+        alt_AF = 0.0
+    else:
+        alt_AF = alt_count / num_aln
 
     return([str(num_aln), ref_pos, ref_seq, alt_seq, alt_count, alt_AF])
 
@@ -235,7 +243,8 @@ def main():
             print("POS", "num_aln", "REF", "ALT", "ALT_count", "ALT_AF", sep='\t', file=outfile)
             for result in variant_results:
                 num_aln, ref_pos, ref_seq, alt_seq, alt_count, alt_AF = result
-                print(ref_pos + 1, num_aln, ref_seq, alt_seq, alt_count, alt_AF, sep='\t', file=outfile)
+                if int(num_aln) != 0:
+                    print(ref_pos + 1, num_aln, ref_seq, alt_seq, alt_count, alt_AF, sep='\t', file=outfile)
 
     # Frequency file
     if args.freqfile:
