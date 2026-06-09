@@ -79,7 +79,8 @@ parser.add_argument('-k',
                     action='store_true',
                    required = False)
 
-parser.add_argument('--ambiguous',
+parser.add_argument('-a',
+                    '--ambiguous',
                     help='Use IUPAC ambiguity codes for bases with frequency >= threshold. If provided without a value, the default threshold is 0.2.',
                     nargs='?',
                     const=0.2,

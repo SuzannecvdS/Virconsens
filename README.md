@@ -38,6 +38,8 @@ optional arguments:
                         alleles
   -af MINAF, --minAF MINAF
                         Minimal allele frequency to output
+  -a AMBIGUOUS, --ambiguous AMBIGUOUS
+                        Use IUPAC ambiguity codes for bases with frequency >= threshold. If provided without a value, the default threshold is 0.2.
   --maxdepth MAXDEPTH
                         Maximum depth to consider at any position
 ```
