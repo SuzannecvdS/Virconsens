@@ -336,7 +336,7 @@ def parse_column_freq(ref_pos, allele_list, num_aln, refseq):
     return [ref_pos + 1, A_freq, C_freq, G_freq, T_freq, num_aln, del_freq, ins_freq]
 
 
-def create_coverage_plot(freq_results, output_path, minAF):
+def create_coverage_plot(freq_results, output_path, minAF, mindepth):
     # Coverage plot, when hovering over a position, show the depth and
     # the frequencies of A,C,G,T,del,ins.
     # Positions containing insertions/deletions above minAF are marked.
@@ -392,7 +392,7 @@ def create_coverage_plot(freq_results, output_path, minAF):
         del_freq = row[6]
         ins_freq = row[7]
 
-        if ins_freq >= minAF:
+        if ins_freq >= minAF and depth > mindepth:
             ins_positions.append(pos)
             ins_depths.append(depth)
 
@@ -405,7 +405,7 @@ def create_coverage_plot(freq_results, output_path, minAF):
                 ins_freq
             ])
 
-        if del_freq >= minAF:
+        if del_freq >= minAF and depth > mindepth:
             del_positions.append(pos)
             del_depths.append(depth)
 
@@ -542,7 +542,7 @@ def main():
 
     # Create coverage plot
     if args.coverageplot:
-        create_coverage_plot(freq_results, args.coverageplot, args.ambiguous if args.ambiguous is not None else args.minAF)
+        create_coverage_plot(freq_results, args.coverageplot, args.ambiguous if args.ambiguous is not None else args.minAF, args.mindepth)
     
     # Build consensus sequence by walking through genome positions
     consensus = []
