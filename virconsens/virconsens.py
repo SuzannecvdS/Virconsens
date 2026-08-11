@@ -6,6 +6,7 @@ import re
 import multiprocessing
 import itertools
 import plotly
+import plotly.graph_objects as go
 
 
 parser = argparse.ArgumentParser(description='Virconsens')
@@ -335,6 +336,163 @@ def parse_column_freq(ref_pos, allele_list, num_aln, refseq):
     return [ref_pos + 1, A_freq, C_freq, G_freq, T_freq, num_aln, del_freq, ins_freq]
 
 
+def create_coverage_plot(freq_results, output_path, minAF):
+    # Coverage plot, when hovering over a position, show the depth and
+    # the frequencies of A,C,G,T,del,ins.
+    # Positions containing insertions/deletions above minAF are marked.
+
+    positions = [row[0] for row in freq_results]
+    depths = [row[5] for row in freq_results]
+    A_freqs = [row[1] for row in freq_results]
+    C_freqs = [row[2] for row in freq_results]
+    G_freqs = [row[3] for row in freq_results]
+    T_freqs = [row[4] for row in freq_results]
+    del_freqs = [row[6] for row in freq_results]
+    ins_freqs = [row[7] for row in freq_results]
+
+    fig = go.Figure()
+
+    # Main coverage trace
+    fig.add_trace(
+        go.Scatter(x=positions, y=depths, mode='lines', name='Coverage', line=dict(color='royalblue', width=2),
+            customdata=list(zip(A_freqs, C_freqs, G_freqs, T_freqs, del_freqs, ins_freqs)),
+            hovertemplate=
+                'Position: %{x}<br>' +
+                'Depth: %{y}<br>' +
+                'A_freq: %{customdata[0]:.2f}<br>'+
+                'C_freq: %{customdata[1]:.2f}<br>'+
+                'G_freq: %{customdata[2]:.2f}<br>'+
+                'T_freq: %{customdata[3]:.2f}<br>'+
+                'Del_freq: %{customdata[4]:.2f}<br>'+
+                'Ins_freq: %{customdata[5]:.2f}<extra></extra>'
+        )
+    )
+
+    # Collect insertion positions
+    ins_positions = []
+    ins_depths = []
+    ins_hover = []
+
+    # Collect deletion positions
+    del_positions = []
+    del_depths = []
+    del_hover = []
+
+    for row in freq_results:
+
+        pos = row[0]
+
+        A_freq = row[1]
+        C_freq = row[2]
+        G_freq = row[3]
+        T_freq = row[4]
+
+        depth = row[5]
+
+        del_freq = row[6]
+        ins_freq = row[7]
+
+        if ins_freq >= minAF:
+            ins_positions.append(pos)
+            ins_depths.append(depth)
+
+            ins_hover.append([
+                A_freq,
+                C_freq,
+                G_freq,
+                T_freq,
+                del_freq,
+                ins_freq
+            ])
+
+        if del_freq >= minAF:
+            del_positions.append(pos)
+            del_depths.append(depth)
+
+            del_hover.append([
+                A_freq,
+                C_freq,
+                G_freq,
+                T_freq,
+                del_freq,
+                ins_freq
+            ])
+
+    # Insertion markers
+    if len(ins_positions) > 0:
+
+        fig.add_trace(
+            go.Scatter(
+                x=ins_positions,
+                y=ins_depths,
+                mode='markers',
+                name='Insertion (AF ≥ threshold)',
+                marker=dict(
+                    symbol='hexagram',
+                    color='#FFC107',
+                    size=12,
+                    
+                ),
+                customdata=ins_hover,
+                hovertemplate=
+                    '<b>INSERTION</b><br>' +
+                    'Position: %{x}<br>' +
+                    'Depth: %{y}<br>' +
+                    'A_freq: %{customdata[0]:.2f}<br>'+
+                    'C_freq: %{customdata[1]:.2f}<br>'+
+                    'G_freq: %{customdata[2]:.2f}<br>'+
+                    'T_freq: %{customdata[3]:.2f}<br>'+
+                    'Del_freq: %{customdata[4]:.2f}<br>'+
+                    'Ins_freq: %{customdata[5]:.2f}<extra></extra>'
+            )
+        )
+
+    # Deletion markers
+    if len(del_positions) > 0:
+
+        fig.add_trace(
+            go.Scatter(
+                x=del_positions,
+                y=del_depths,
+                mode='markers',
+                name='Deletion (AF ≥ threshold)',
+                marker=dict(
+                    symbol='diamond',
+                    color='#DC267F',
+                    size=12,
+                    
+                ),
+                customdata=del_hover,
+                hovertemplate=
+                    '<b>DELETION</b><br>' +
+                    'Position: %{x}<br>' +
+                    'Depth: %{y}<br>' +
+                    'A_freq: %{customdata[0]:.2f}<br>'+
+                    'C_freq: %{customdata[1]:.2f}<br>'+
+                    'G_freq: %{customdata[2]:.2f}<br>'+
+                    'T_freq: %{customdata[3]:.2f}<br>'+
+                    'Del_freq: %{customdata[4]:.2f}<br>'+
+                    'Ins_freq: %{customdata[5]:.2f}<extra></extra>'
+            )
+        )
+
+    fig.update_layout(
+        title='Coverage Plot with Indel Markers',
+        xaxis_title='Position',
+        yaxis_title='Depth',
+        hovermode='closest',
+        template='plotly_white',
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='left',
+            x=0
+        )
+    )
+
+    fig.write_html(output_path)
+
 def main():
     args = parser.parse_args()
 
@@ -382,32 +540,9 @@ def main():
             for pos1, A_f, C_f, G_f, T_f, depth, del_f, ins_f in freq_results:
                 print(pos1, A_f, C_f, G_f, T_f, depth, del_f, ins_f, sep=',', file=ffile)
 
-    # Coverage plot, when hovering over a position, show the depth and the frequencies of A,C,G,T,del,ins
+    # Create coverage plot
     if args.coverageplot:
-        positions = [row[0] for row in freq_results]
-        depths = [row[5] for row in freq_results]
-        A_freqs = [row[1] for row in freq_results]
-        C_freqs = [row[2] for row in freq_results]
-        G_freqs = [row[3] for row in freq_results]
-        T_freqs = [row[4] for row in freq_results]
-        del_freqs = [row[6] for row in freq_results]
-        ins_freqs = [row[7] for row in freq_results]
-
-        fig = plotly.graph_objects.Figure(data=plotly.graph_objects.Scatter(x=positions, y=depths, mode='lines',
-            hovertemplate=
-                'Position: %{x}<br>'+
-                'Depth: %{y}<br>'+
-                'A_freq: %{customdata[0]:.2f}<br>'+
-                'C_freq: %{customdata[1]:.2f}<br>'+
-                'G_freq: %{customdata[2]:.2f}<br>'+
-                'T_freq: %{customdata[3]:.2f}<br>'+
-                'Del_freq: %{customdata[4]:.2f}<br>'+
-                'Ins_freq: %{customdata[5]:.2f}<extra></extra>',
-            customdata=list(zip(A_freqs, C_freqs, G_freqs, T_freqs, del_freqs, ins_freqs))
-        ))
-
-        fig.update_layout(title='Coverage Plot', xaxis_title='Position', yaxis_title='Depth')
-        fig.write_html(args.coverageplot)
+        create_coverage_plot(freq_results, args.coverageplot, args.ambiguous if args.ambiguous is not None else args.minAF)
     
     # Build consensus sequence by walking through genome positions
     consensus = []
