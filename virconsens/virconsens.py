@@ -69,7 +69,7 @@ parser.add_argument('-d',
 
 parser.add_argument('-af', 
                     '--minAF',
-                    help='Minimal allele frequency to output',
+                    help='Minimum allele frequency required for inclusion in the consensus',
                     default=0.1,
                     type=float,
                    required = False)
@@ -82,11 +82,8 @@ parser.add_argument('-k',
 
 parser.add_argument('-a',
                     '--ambiguous',
-                    help='Use IUPAC ambiguity codes for bases with frequency >= threshold. If provided without a value, the default threshold is 0.2.',
-                    nargs='?',
-                    const=0.2,
-                    default=None,
-                    type=float)
+                    help='Use IUPAC ambiguity codes',
+                    action='store_true')
 
 parser.add_argument('--maxdepth',
                     help='Maximum depth to consider at any position',
@@ -241,19 +238,20 @@ def allele_is_indel(ref_seq, alt_seq):
     return len(ref_seq) != len(alt_seq)
 
 
-def select_consensus_allele(variant_row, freq_row, ambiguous_threshold, minAF, mindepth, keepindels):
+def select_consensus_allele(variant_row, freq_row, ambiguous, minAF, mindepth, keepindels):
     """Select the consensus base for a position based on multiple criteria.
     
     Decision logic (in order):
-    1. Returns 'N' if depth < mindepth or allele frequency < minAF
-    2. If ambiguous_threshold set and allele is SNV: returns IUPAC code based on threshold
-    3. For small indels (1-2 nt) when not keeping indels: returns reference to avoid frameshift
-    4. Otherwise returns the alternate allele
+    1. Returns 'N' if depth < mindepth
+    2. If ambiguous is True and allele is SNV: returns IUPAC code based on minAF threshold
+    3. Returns 'N' if alt_AF < minAF
+    4. For small indels (1-2 nt) when not keeping indels: returns reference to avoid frameshift
+    5. Otherwise returns the alternate allele
     
     Args:
         variant_row (list): Variant info [num_aln, pos, ref_seq, alt_seq, alt_count, alt_AF].
         freq_row (list): Frequency info [pos, A_freq, C_freq, G_freq, T_freq, depth, del_freq, ins_freq].
-        ambiguous_threshold (float or None): Frequency threshold for IUPAC ambiguity codes.
+        ambiguous (bool): Whether to use IUPAC ambiguity codes.
         minAF (float): Minimum allele frequency threshold.
         mindepth (int): Minimum depth threshold.
         keepindels (bool): Whether to keep small indels in consensus.
@@ -266,12 +264,15 @@ def select_consensus_allele(variant_row, freq_row, ambiguous_threshold, minAF, m
     alt_seq = variant_row[3]
     alt_AF = variant_row[5]
 
-    if num_aln < mindepth or alt_AF < minAF:
+    if num_aln < mindepth:
         return 'N'
 
-    if ambiguous_threshold is not None and not allele_is_indel(ref_seq, alt_seq):
-        iupac = choose_iupac_base(freq_row, ambiguous_threshold)
+    if ambiguous is True and not allele_is_indel(ref_seq, alt_seq):
+        iupac = choose_iupac_base(freq_row, minAF)
         return iupac if iupac is not None else 'N'
+
+    if alt_AF < minAF:
+        return 'N'
 
     if allele_is_indel(ref_seq, alt_seq) and abs(len(ref_seq) - len(alt_seq)) in [1, 2] and not keepindels:
         return ref_seq
@@ -542,7 +543,7 @@ def main():
 
     # Create coverage plot
     if args.coverageplot:
-        create_coverage_plot(freq_results, args.coverageplot, args.ambiguous if args.ambiguous is not None else args.minAF, args.mindepth)
+        create_coverage_plot(freq_results, args.coverageplot, args.minAF, args.mindepth)
     
     # Build consensus sequence by walking through genome positions
     consensus = []
